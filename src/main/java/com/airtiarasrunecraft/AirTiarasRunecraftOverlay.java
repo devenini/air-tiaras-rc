@@ -1,12 +1,12 @@
 package com.airtiarasrunecraft;
 
 import lombok.extern.slf4j.Slf4j;
-import java.awt.Dimension;
-import java.awt.Graphics2D;
-import java.time.Duration;
-import java.time.Instant;
+
+import java.awt.*;
+import java.util.EnumSet;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.WorldType;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.PanelComponent;
@@ -32,12 +32,12 @@ class AirTiarasRunecraftOverlay extends Overlay
     }
 
     @Override
-    public Dimension render(Graphics2D graphics)
-    {
+    public Dimension render(Graphics2D graphics) {
         AirTiarasRunecraftSession session = plugin.getSession();
+        Stopwatch stopwatch = plugin.getStopWatch();
 
         panelComponent.getChildren().clear();
-        String overlayTitle = "Current Session:";
+        String overlayTitle = "Air tiaras RC:";
 
         // Build overlay title
         panelComponent.getChildren().add(TitleComponent.builder()
@@ -49,23 +49,40 @@ class AirTiarasRunecraftOverlay extends Overlay
                 graphics.getFontMetrics().stringWidth(overlayTitle) + 30,
                 0));
 
-        // Add a line on the overlay for world number
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left("Current World:")
-                .right(Integer.toString(client.getWorld()))
-                .build());
+        if (config.showCurrentWorld()) {
+            EnumSet<WorldType> worldType = client.getWorldType();
+            Color currentWorldColor;
 
-        if (!config.showLapCount() ||
-                session == null ||
-                session.getLastLapCompleted() == null)
-        {
-            return null;
+            if (worldType.contains(WorldType.MEMBERS))
+            {
+                currentWorldColor = Color.RED;
+            }
+            else
+            {
+                currentWorldColor = Color.WHITE;
+            }
+
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("World:")
+                    .right(Integer.toString(client.getWorld()))
+                    .rightColor(currentWorldColor)
+                    .build());
         }
 
-        panelComponent.getChildren().add(LineComponent.builder()
-                .left("Total Laps:")
-                .right(Integer.toString(session.getTotalLaps()))
-                .build());
+        if (config.showLapTime()) {
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Lap time:")
+                    .right(stopwatch.secondsToString((int) stopwatch.getDisplayTime()))
+                    .build());
+        }
+
+        if (config.showBestLap() && !stopwatch.getLaps().isEmpty()) {
+            panelComponent.getChildren().add(LineComponent.builder()
+                    .left("Best lap:")
+                    .right(stopwatch.getFormatedBestLap())
+                    .rightColor(Color.GREEN)
+                    .build());
+        }
 
         if (config.lapsToLevel() && session.getLapsTillGoal() > 0)
         {
@@ -75,13 +92,22 @@ class AirTiarasRunecraftOverlay extends Overlay
                     .build());
         }
 
-        if (config.lapsPerHour() && session.getLapsPerHour() > 0)
+        if (config.showTotalLaps())
         {
-            panelComponent.getChildren().add(LineComponent.builder()
-                    .left("Laps per hour:")
-                    .right(Integer.toString(session.getLapsPerHour()))
-                    .build());
+        panelComponent.getChildren().add(LineComponent.builder()
+                .left("Total Laps:")
+                .right(Integer.toString(session.getTotalLaps()))
+                .build());
         }
+
+//        if (config.lapsPerHour() && session.getLapsPerHour() > 0)
+//        {
+//            panelComponent.getChildren().add(LineComponent.builder()
+//                    .left("Laps per hour:")
+//                    .right(Integer.toString(session.getLapsPerHour()))
+//                    .build());
+//        }
+
 
         return panelComponent.render(graphics);
     }

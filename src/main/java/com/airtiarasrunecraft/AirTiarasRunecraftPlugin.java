@@ -20,8 +20,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.util.Objects;
 
 import static net.runelite.api.Skill.RUNECRAFT;
 
@@ -51,17 +50,19 @@ public class AirTiarasRunecraftPlugin extends Plugin {
     private XpTrackerService xpTrackerService;
 
     @Getter
-    private int runecraftLevel;
-
-    @Getter
     private boolean lapStarted;
-    private Instant lapStartTime;
+    @Getter
+    @Setter
+    private Stopwatch stopWatch;
     private boolean isValidLap = false;
-
+    //@todo : Only allow to start laps on free to play world. Lap should reset if hopping in p2p
+    private final boolean allowedToStartLap = false;
     private WorldPoint lastLocation = null;
+    private final WorldPoint startLocation = new WorldPoint(2933, 3288, 0);
+    private final WorldPoint stopLocation = new WorldPoint(2933, 3289, 0);
 
-	private WorldPoint startLocation = new WorldPoint(2933, 3288, 0);
-    private WorldPoint stopLocation = new WorldPoint(2933, 3289, 0);
+    public AirTiarasRunecraftPlugin() {
+    }
 
     @Provides
     AirTiarasRunecraftConfig provideConfig(ConfigManager configManager) {
@@ -74,54 +75,55 @@ public class AirTiarasRunecraftPlugin extends Plugin {
         resetLap();
 
         session = new AirTiarasRunecraftSession();
+        stopWatch = new Stopwatch("Stopwatch");
 
-        //overlayManager.add(lapCounterOverlay);
         overlayManager.add(airTiarasRunecraftOverlay);
-        runecraftLevel = client.getBoostedSkillLevel(RUNECRAFT);
-
-        log.info("startUp");
     }
 
     @Override
     protected void shutDown() throws Exception {
-        //overlayManager.remove(lapCounterOverlay);
         overlayManager.remove(airTiarasRunecraftOverlay);
         session = null;
-        runecraftLevel = 0;
+        stopWatch = null;
     }
 
     @Subscribe
     public void onGameTick(GameTick tick) {
+        try {
+            if (isOnStopTile() && lapStarted && isValidLap) {
+                // Stop the lap
+                stopLap();
+            } else if (isOnStartTile() && !lapStarted && Objects.requireNonNull(lastLocation).hashCode() == Objects.requireNonNull(stopLocation).hashCode()) {
+                // Start a lap
+                startLap();
+            }
 
-        if(isOnStopTile() && lapStarted && !isValidLap) {
-            // Stop the lap
-            stopLap();
-        } else if(isOnStartTile() && !lapStarted) {
-            // Start a lap
-            startLap();
+            //Register last location tile of the player
+            if (lastLocation != getPlayerLocation()) {
+                lastLocation = getPlayerLocation();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-
-        //Register last location of the player
-        lastLocation = getPlayerLocation();
-        //log.debug(lastLocation.toString());
     }
+
     @Subscribe
-    public void onStatChanged(StatChanged statChanged)
-    {
-        if (statChanged.getSkill() != RUNECRAFT)
-        {
+    public void onStatChanged(StatChanged statChanged) {
+        if (statChanged.getSkill() != RUNECRAFT) {
             return;
         }
 
+        //Making sure a player earned Runecraft xp to make the world count
+        //@todo : Add more conditions, such as making tiaras, suiciding, claiming talisman;
         isValidLap = true;
     }
 
     private boolean isOnStartTile() {
-        return startLocation.hashCode() == getPlayerLocation().hashCode();
+        return startLocation.hashCode() == Objects.requireNonNull(getPlayerLocation()).hashCode();
     }
 
     private boolean isOnStopTile() {
-        return stopLocation.hashCode() == getPlayerLocation().hashCode();
+        return stopLocation.hashCode() == Objects.requireNonNull(getPlayerLocation()).hashCode();
     }
 
     private WorldPoint getPlayerLocation() {
@@ -134,32 +136,33 @@ public class AirTiarasRunecraftPlugin extends Plugin {
 
         return location;
     }
-    private void startLap()
-    {
+
+    private void startLap() {
         // Reset lap attributes
-        log.info("Reset lap attributes");
         resetLap();
 
         // Start timer
-        log.info("Start timer here");
-        lapStartTime = Instant.now();
+        stopWatch.start();
 
+        // Set lap started
         lapStarted = true;
     }
-    private void stopLap()
-    {
+
+    private void stopLap() {
         // End timer
-        log.info("End timer here");
+        stopWatch.pause();
+
         // Register lap
-        log.info("Push lap time to session");
-        log.info("Increment lap count");
+        stopWatch.lap();
+
+        // Increment lap count
         session.incrementLapCount(client, xpTrackerService);
 
         // Clear lap data
         resetLap();
     }
-    private void resetLap()
-    {
+
+    private void resetLap() {
         lapStarted = false;
         isValidLap = false;
     }

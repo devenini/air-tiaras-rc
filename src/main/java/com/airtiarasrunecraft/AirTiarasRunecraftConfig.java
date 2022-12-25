@@ -9,23 +9,42 @@ import net.runelite.client.config.Units;
 public interface AirTiarasRunecraftConfig extends Config
 {
 	@ConfigItem(
-			keyName = "showLapCount",
-			name = "Show Lap Count",
-			description = "Enable/disable the lap counter",
+			keyName = "showCurrentWorld",
+			name = "Show Current World",
+			description = "Enable/disable the current world",
 			position = 1
 	)
-	default boolean showLapCount()
+	default boolean showCurrentWorld()
 	{
 		return true;
 	}
-
 	@ConfigItem(
 			keyName = "showLapTime",
-			name = "Show Lap Time",
+			name = "Show lap time",
 			description = "Enable/disable the lap time",
 			position = 1
 	)
 	default boolean showLapTime()
+	{
+		return true;
+	}
+	@ConfigItem(
+			keyName = "showBestLap",
+			name = "Show best lap time",
+			description = "Enable/disable the best lap time",
+			position = 1
+	)
+	default boolean showBestLap()
+	{
+		return true;
+	}
+	@ConfigItem(
+			keyName = "showTotalLaps",
+			name = "Show Lap Count",
+			description = "Enable/disable the lap counter",
+			position = 1
+	)
+	default boolean showTotalLaps()
 	{
 		return true;
 	}
@@ -41,16 +60,16 @@ public interface AirTiarasRunecraftConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(
-			keyName = "lapsPerHour",
-			name = "Show Laps Per Hour",
-			description = "Shows how many laps you can expect to complete per hour.",
-			position = 4
-	)
-	default boolean lapsPerHour()
-	{
-		return true;
-	}
+//	@ConfigItem(
+//			keyName = "lapsPerHour",
+//			name = "Show Laps Per Hour",
+//			description = "Shows how many laps you can expect to complete per hour.",
+//			position = 4
+//	)
+//	default boolean lapsPerHour()
+//	{
+//		return true;
+//	}
 
 	@ConfigItem(
 			keyName = "lapTimeout",

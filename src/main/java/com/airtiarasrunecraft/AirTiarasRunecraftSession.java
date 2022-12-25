@@ -3,6 +3,7 @@ package com.airtiarasrunecraft;
 import com.google.common.collect.EvictingQueue;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Skill;
 import net.runelite.client.plugins.xptracker.XpTrackerService;
@@ -11,6 +12,7 @@ import java.time.Instant;
 
 @Getter
 @Setter
+@Slf4j
 class AirTiarasRunecraftSession {
     private Instant lastLapCompleted;
     private int totalLaps;
@@ -23,6 +25,15 @@ class AirTiarasRunecraftSession {
 
         ++totalLaps;
 
+        calculateLapsUntilGoal(client, xpTrackerService);
+    }
+
+    /**
+     * @param client
+     * @param xpTrackerService
+     */
+    void calculateLapsUntilGoal(Client client, XpTrackerService xpTrackerService)
+    {
         final int currentExp = client.getSkillExperience(Skill.RUNECRAFT);
         final int goalXp = xpTrackerService.getEndGoalXp(Skill.RUNECRAFT);
         final int goalRemainingXp = goalXp - currentExp;
