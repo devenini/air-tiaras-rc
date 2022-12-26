@@ -37,7 +37,7 @@ class AirTiarasRunecraftOverlay extends Overlay
         Stopwatch stopwatch = plugin.getStopWatch();
 
         panelComponent.getChildren().clear();
-        String overlayTitle = "Air tiaras RC:";
+        String overlayTitle = "Air Tiaras Runecraft:";
 
         // Build overlay title
         panelComponent.getChildren().add(TitleComponent.builder()
@@ -46,7 +46,7 @@ class AirTiarasRunecraftOverlay extends Overlay
 
         // Set the size of the overlay (width)
         panelComponent.setPreferredSize(new Dimension(
-                graphics.getFontMetrics().stringWidth(overlayTitle) + 30,
+                graphics.getFontMetrics().stringWidth(overlayTitle) + 10,
                 0));
 
         if (config.showCurrentWorld()) {
@@ -76,11 +76,11 @@ class AirTiarasRunecraftOverlay extends Overlay
                     .build());
         }
 
-        if (config.showBestLap() && !stopwatch.getLaps().isEmpty()) {
+        if (config.showBestLap()) {
             panelComponent.getChildren().add(LineComponent.builder()
                     .left("Best lap:")
-                    .right(stopwatch.getFormatedBestLap())
-                    .rightColor(Color.GREEN)
+                    .right((!stopwatch.getLaps().isEmpty()) ? stopwatch.getFormatedBestLap() : "--")
+                    .rightColor((!stopwatch.getLaps().isEmpty()) ? Color.GREEN : Color.WHITE)
                     .build());
         }
 
@@ -95,19 +95,10 @@ class AirTiarasRunecraftOverlay extends Overlay
         if (config.showTotalLaps())
         {
         panelComponent.getChildren().add(LineComponent.builder()
-                .left("Total Laps:")
+                .left("Total laps:")
                 .right(Integer.toString(session.getTotalLaps()))
                 .build());
         }
-
-//        if (config.lapsPerHour() && session.getLapsPerHour() > 0)
-//        {
-//            panelComponent.getChildren().add(LineComponent.builder()
-//                    .left("Laps per hour:")
-//                    .right(Integer.toString(session.getLapsPerHour()))
-//                    .build());
-//        }
-
 
         return panelComponent.render(graphics);
     }

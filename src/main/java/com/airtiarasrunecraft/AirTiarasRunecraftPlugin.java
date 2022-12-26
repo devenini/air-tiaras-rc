@@ -5,8 +5,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.Player;
 import net.runelite.api.coords.WorldPoint;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
 import net.runelite.client.config.ConfigManager;
@@ -16,13 +18,14 @@ import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.xptracker.XpTrackerPlugin;
 import net.runelite.client.plugins.xptracker.XpTrackerService;
+import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
 
-import java.util.Objects;
+import java.util.function.Predicate;
 
-import static net.runelite.api.Skill.RUNECRAFT;
+import static net.runelite.api.Skill.*;
 
 @PluginDescriptor(
         name = "Air Tiaras Runecraft"
@@ -30,39 +33,31 @@ import static net.runelite.api.Skill.RUNECRAFT;
 @PluginDependency(XpTrackerPlugin.class)
 @Slf4j
 public class AirTiarasRunecraftPlugin extends Plugin {
+    private final WorldPoint startLocation = new WorldPoint(2933, 3288, 0);
+    private final WorldPoint stopLocation = new WorldPoint(2933, 3289, 0);
     @Inject
     private Client client;
-
     @Inject
     private AirTiarasRunecraftConfig config;
-
     @Inject
     private OverlayManager overlayManager;
-
     @Inject
     private AirTiarasRunecraftOverlay airTiarasRunecraftOverlay;
-
     @Getter
     @Setter
-    private AirTiarasRunecraftSession session = new AirTiarasRunecraftSession();
-
+    private AirTiarasRunecraftSession session;
     @Inject
     private XpTrackerService xpTrackerService;
-
-    @Getter
-    private boolean lapStarted;
+    private boolean lapStarted = false;
     @Getter
     @Setter
     private Stopwatch stopWatch;
-    private boolean isValidLap = false;
-    //@todo : Only allow to start laps on free to play world. Lap should reset if hopping in p2p
-    private final boolean allowedToStartLap = false;
-    private WorldPoint lastLocation = null;
-    private final WorldPoint startLocation = new WorldPoint(2933, 3288, 0);
-    private final WorldPoint stopLocation = new WorldPoint(2933, 3289, 0);
-
-    public AirTiarasRunecraftPlugin() {
-    }
+    private boolean hasGainedRcXp = false;
+    private boolean hasGainedMiningXp = false;
+    private boolean hasGainedSmithingXp = false;
+    private boolean hasGainedCraftingXp = false;
+    private WorldPoint lastLocation;
+    private boolean isFirstGameTick = true;
 
     @Provides
     AirTiarasRunecraftConfig provideConfig(ConfigManager configManager) {
@@ -71,13 +66,12 @@ public class AirTiarasRunecraftPlugin extends Plugin {
 
     @Override
     protected void startUp() throws Exception {
-        lastLocation = getPlayerLocation();
         resetLap();
 
         session = new AirTiarasRunecraftSession();
         stopWatch = new Stopwatch("Stopwatch");
 
-        overlayManager.add(airTiarasRunecraftOverlay);
+        lastLocation = getPlayerLocation();
     }
 
     @Override
@@ -87,47 +81,82 @@ public class AirTiarasRunecraftPlugin extends Plugin {
         stopWatch = null;
     }
 
+    /**
+     * Event listening every game tick.
+     * @param tick
+     */
     @Subscribe
     public void onGameTick(GameTick tick) {
-        try {
-            if (isOnStopTile() && lapStarted && isValidLap) {
-                // Stop the lap
-                stopLap();
-            } else if (isOnStartTile() && !lapStarted && Objects.requireNonNull(lastLocation).hashCode() == Objects.requireNonNull(stopLocation).hashCode()) {
-                // Start a lap
-                startLap();
-            }
+        if(!isFirstGameTick) {
+            try {
+                if (isOnStopTile() && lapStarted && isValidLap()) {
+                    // Stop the lap
+                    stopLap();
+                } else if (isOnStartTile() && !lapStarted && lastLocation.hashCode() == stopLocation.hashCode()) {
+                    // Start a lap
+                    startLap();
+                }
 
-            //Register last location tile of the player
-            if (lastLocation != getPlayerLocation()) {
-                lastLocation = getPlayerLocation();
+                //Register last location tile of the player
+                if (lastLocation != getPlayerLocation()) {
+                    lastLocation = getPlayerLocation();
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        } else {
+            // first tick; save player location
+            lastLocation = getPlayerLocation();
+
+            isFirstGameTick = false;
         }
     }
 
+    /**
+     * Event listening to stat change.
+     * @param statChanged
+     */
     @Subscribe
     public void onStatChanged(StatChanged statChanged) {
-        if (statChanged.getSkill() != RUNECRAFT) {
+        if(isFirstGameTick) {
             return;
         }
 
-        //Making sure a player earned Runecraft xp to make the world count
-        //@todo : Add more conditions, such as making tiaras, suiciding, claiming talisman;
-        isValidLap = true;
+        if (statChanged.getSkill() == RUNECRAFT) {
+            hasGainedRcXp = true;
+        } else if(statChanged.getSkill() == MINING) {
+            hasGainedMiningXp = true;
+        } else if(statChanged.getSkill() == CRAFTING) {
+            hasGainedCraftingXp = true;
+        } else if(statChanged.getSkill() == SMITHING) {
+            hasGainedSmithingXp = true;
+        }
+    }
+
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged gameStateChanged)
+    {
+        if (gameStateChanged.getGameState() == GameState.HOPPING)
+        {
+            isFirstGameTick = true;
+        }
     }
 
     private boolean isOnStartTile() {
-        return startLocation.hashCode() == Objects.requireNonNull(getPlayerLocation()).hashCode();
+        return startLocation.hashCode() == getPlayerLocation().hashCode();
     }
 
     private boolean isOnStopTile() {
-        return stopLocation.hashCode() == Objects.requireNonNull(getPlayerLocation()).hashCode();
+        return stopLocation.hashCode() == getPlayerLocation().hashCode();
+    }
+
+    private boolean isValidLap() {
+        return hasGainedRcXp && hasGainedCraftingXp && hasGainedSmithingXp && hasGainedMiningXp;
     }
 
     private WorldPoint getPlayerLocation() {
         Player local = client.getLocalPlayer();
+
         if (local == null) {
             return null;
         }
@@ -146,6 +175,14 @@ public class AirTiarasRunecraftPlugin extends Plugin {
 
         // Set lap started
         lapStarted = true;
+
+        // Update laps until goal
+        session.calculateLapsUntilGoal(client, xpTrackerService);
+
+        // Add overlay if it doesn't already exist
+        if(!overlayManager.anyMatch(overlay -> overlay.getName() == airTiarasRunecraftOverlay.getName())) {
+            overlayManager.add(airTiarasRunecraftOverlay);
+        }
     }
 
     private void stopLap() {
@@ -164,6 +201,9 @@ public class AirTiarasRunecraftPlugin extends Plugin {
 
     private void resetLap() {
         lapStarted = false;
-        isValidLap = false;
+        hasGainedRcXp = false;
+        hasGainedCraftingXp = false;
+        hasGainedSmithingXp = false;
+        hasGainedMiningXp = false;
     }
 }
