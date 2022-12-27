@@ -136,8 +136,10 @@ public class AirTiarasRunecraftPlugin extends Plugin {
     @Subscribe
     public void onGameStateChanged(GameStateChanged gameStateChanged)
     {
-        if (gameStateChanged.getGameState() == GameState.HOPPING)
-        {
+        if (
+                gameStateChanged.getGameState() == GameState.LOGGED_IN ||
+                gameStateChanged.getGameState() == GameState.HOPPING
+        ) {
             isFirstGameTick = true;
         }
     }
